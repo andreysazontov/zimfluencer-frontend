@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": {
+    "node": "22"
+  },
+  "steps": {
+    "install": {
+      "commands": [
+        {
+          "type": "copy",
+          "paths": ["package.json", "package-lock.json"]
+        },
+        {
+          "type": "exec",
+          "command": "npm ci --production=false"
+        }
+      ]
+    },
+    "build": {
+      "inputs": [
+        {
+          "step": "install"
+        }
+      ],
+      "commands": [
+        {
+          "type": "copy",
+          "paths": ["."]
+        },
+        {
+          "type": "exec",
+          "command": "npm run build"
+        }
+      ],
+      "variables": {
+        "NODE_ENV": "production",
+        "VITE_API_URL": "$VITE_API_URL"
+      }
+    }
+  },
+  "caches": {
+    "npm": {
+      "path": "/root/.npm"
+    }
+  },
+  "deploy": {
+    "inputs": [
+      {
+        "step": "build",
+        "include": ["dist", "node_modules", "package.json"]
+      }
+    ],
+    "startCommand": "npx vite preview --port $PORT --host 0.0.0.0",
+    "aptPackages": ["ca-certificates"],
+    "variables": {
+      "NODE_ENV": "production",
+      "PORT": "5173"
+    },
+    "paths": ["/app/node_modules/.bin"]
+  }
+}

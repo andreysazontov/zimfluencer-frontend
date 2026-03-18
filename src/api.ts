@@ -1,5 +1,9 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
 
+export const getApiKey = (): string | null => sessionStorage.getItem("zim_api_key");
+export const setApiKey = (key: string): void => sessionStorage.setItem("zim_api_key", key);
+export const clearApiKey = (): void => sessionStorage.removeItem("zim_api_key");
+
 export type AutonomyLevel = "L0" | "L1" | "L2" | "L3";
 export type PolicyMode = "STRICT" | "STANDARD";
 export type PersonaSourceMode = "FROM_REFERENCES" | "FROM_SCRATCH";
@@ -192,9 +196,11 @@ export interface VideoEngineStatus {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const apiKey = getApiKey();
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(apiKey ? { "x-api-key": apiKey } : {}),
       ...(init?.headers ?? {})
     },
     ...init

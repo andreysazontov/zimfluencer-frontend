@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
+  getApiKey,
+  setApiKey,
+  clearApiKey,
   type AuditEvent,
   type AutonomyLevel,
   type AutonomyProfile,
@@ -210,7 +213,56 @@ function errorMessage(error: unknown): string {
   return "Unexpected error";
 }
 
-export default function App() {
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const [authed, setAuthed] = useState(() => !!getApiKey());
+  const [key, setKey] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setError("");
+    setLoading(true);
+    setApiKey(key);
+    try {
+      await api.listProfiles();
+      setAuthed(true);
+    } catch {
+      clearApiKey();
+      setError("Invalid key or API unreachable");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (authed) return <>{children}</>;
+
+  return (
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#0a0a0f" }}>
+      <div style={{ background: "#12121a", border: "1px solid #1e1e2e", borderRadius: 12, padding: 32, width: 340, textAlign: "center" }}>
+        <h2 style={{ color: "#00e5ff", margin: "0 0 8px" }}>ZimFluencer</h2>
+        <p style={{ color: "#888", fontSize: 13, margin: "0 0 20px" }}>Enter your access key</p>
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+          placeholder="Secret key"
+          style={{ width: "100%", padding: "10px 12px", background: "#1a1a2e", border: "1px solid #2a2a3e", borderRadius: 8, color: "#fff", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }}
+        />
+        <button
+          onClick={handleLogin}
+          disabled={!key || loading}
+          style={{ width: "100%", padding: "10px 0", background: "#00e5ff", color: "#000", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: key && !loading ? "pointer" : "not-allowed", opacity: key && !loading ? 1 : 0.5 }}
+        >
+          {loading ? "Checking..." : "Unlock"}
+        </button>
+        {error && <p style={{ color: "#ff4444", fontSize: 13, marginTop: 10 }}>{error}</p>}
+      </div>
+    </div>
+  );
+}
+
+function AppInner() {
   const profileRefreshRequestRef = useRef(0);
   const cycleRefreshRequestRef = useRef(0);
   const metaRefreshRequestRef = useRef(0);
@@ -2513,5 +2565,13 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthGate>
+      <AppInner />
+    </AuthGate>
   );
 }

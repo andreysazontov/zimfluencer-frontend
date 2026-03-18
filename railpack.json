@@ -6,7 +6,7 @@
   },
   "steps": {
     "install": {
-      "commands": ["npm ci --production=false"]
+      "commands": ["npm install"]
     },
     "build": {
       "inputs": [{ "step": "install" }],
@@ -17,18 +17,11 @@
       }
     }
   },
-  "caches": {
-    "npm": {
-      "path": "/root/.npm"
-    }
-  },
   "deploy": {
     "startCommand": "npx vite preview --port $PORT --host 0.0.0.0",
-    "aptPackages": ["ca-certificates"],
     "variables": {
       "NODE_ENV": "production",
       "PORT": "5173"
-    },
-    "paths": ["/app/node_modules/.bin"]
+    }
   }
 }

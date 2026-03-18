@@ -6,33 +6,11 @@
   },
   "steps": {
     "install": {
-      "commands": [
-        {
-          "type": "copy",
-          "paths": ["package.json", "package-lock.json"]
-        },
-        {
-          "type": "exec",
-          "command": "npm ci --production=false"
-        }
-      ]
+      "commands": ["npm ci --production=false"]
     },
     "build": {
-      "inputs": [
-        {
-          "step": "install"
-        }
-      ],
-      "commands": [
-        {
-          "type": "copy",
-          "paths": ["."]
-        },
-        {
-          "type": "exec",
-          "command": "npm run build"
-        }
-      ],
+      "inputs": [{ "step": "install" }],
+      "commands": ["npm run build"],
       "variables": {
         "NODE_ENV": "production",
         "VITE_API_URL": "$VITE_API_URL"
@@ -45,12 +23,6 @@
     }
   },
   "deploy": {
-    "inputs": [
-      {
-        "step": "build",
-        "include": ["dist", "node_modules", "package.json"]
-      }
-    ],
     "startCommand": "npx vite preview --port $PORT --host 0.0.0.0",
     "aptPackages": ["ca-certificates"],
     "variables": {

@@ -36,7 +36,8 @@ type PageSort = "UPDATED_DESC" | "UPDATED_ASC" | "NAME_ASC" | "NAME_DESC";
 type AppRoute =
   | { kind: "PAGES" }
   | { kind: "WORKSPACE"; pageId?: string }
-  | { kind: "ADVANCED" };
+  | { kind: "ADVANCED" }
+  | { kind: "ANALYTICS" };
 
 const WORKSPACE_LABELS: Record<GuidedWorkspace, string> = {
   PAGE: "Settings",
@@ -57,6 +58,10 @@ function parseRoute(pathname: string): AppRoute {
     return { kind: "ADVANCED" };
   }
 
+  if (normalized === "/analytics") {
+    return { kind: "ANALYTICS" };
+  }
+
   if (normalized === "/" || normalized === "/pages") {
     return { kind: "PAGES" };
   }
@@ -75,6 +80,7 @@ function parseRoute(pathname: string): AppRoute {
 
 function routePath(route: AppRoute): string {
   if (route.kind === "ADVANCED") return "/advanced";
+  if (route.kind === "ANALYTICS") return "/analytics";
   if (route.kind === "PAGES") return "/pages";
   if (route.pageId) return `/workspace/${encodeURIComponent(route.pageId)}`;
   return "/workspace";
@@ -207,6 +213,48 @@ function parseLifestyleScenes(raw: string): string[] {
   return Array.from(new Set(scenes)).slice(0, 8);
 }
 
+function extractPageIdFromUrl(input: string): string {
+  const trimmed = input.trim();
+
+  // Already a numeric ID
+  if (/^\d{5,}$/.test(trimmed)) return trimmed;
+
+  // profile.php?id=123456
+  const profileMatch = trimmed.match(/profile\.php\?id=(\d+)/);
+  if (profileMatch) return profileMatch[1];
+
+  // facebook.com/pagename or facebook.com/pages/name/123456
+  try {
+    const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+    const parts = url.pathname.split("/").filter(Boolean);
+
+    // /pages/category/123456
+    if (parts[0] === "pages" && parts.length >= 3) {
+      const last = parts[parts.length - 1];
+      if (/^\d+$/.test(last)) return last;
+    }
+
+    // /p/123456 or /123456
+    for (const part of parts) {
+      if (/^\d{5,}$/.test(part)) return part;
+    }
+
+    // /pagename — return the slug, backend will try it
+    if (parts.length === 1 && parts[0] && parts[0] !== "pages") {
+      return parts[0];
+    }
+
+    // /pagename/posts etc
+    if (parts.length >= 1 && parts[0] !== "pages") {
+      return parts[0];
+    }
+  } catch {
+    // Not a URL, use as-is
+  }
+
+  return trimmed;
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -237,26 +285,41 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (authed) return <>{children}</>;
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#0a0a0f" }}>
-      <div style={{ background: "#12121a", border: "1px solid #1e1e2e", borderRadius: 12, padding: 32, width: 340, textAlign: "center" }}>
-        <h2 style={{ color: "#00e5ff", margin: "0 0 8px" }}>ZimFluencer</h2>
-        <p style={{ color: "#888", fontSize: 13, margin: "0 0 20px" }}>Enter your access key</p>
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#080a0f" }}>
+      <div style={{ background: "#111620", border: "1px solid rgba(100,160,240,0.08)", borderRadius: 20, padding: "40px 32px", width: 360, textAlign: "center" }}>
+        <div style={{ width: 48, height: 48, margin: "0 auto 16px", borderRadius: 12, overflow: "hidden" }}>
+          <img src={logoImage} alt="ZimFluencer" width={48} height={48} style={{ display: "block" }} />
+        </div>
+        <h2 style={{ fontFamily: "Outfit, sans-serif", fontWeight: 700, fontSize: 22, letterSpacing: "-0.03em", color: "#e8ecf4", margin: "0 0 4px" }}>ZimFluencer</h2>
+        <p style={{ color: "#546380", fontSize: 13, margin: "0 0 24px" }}>Enter your access key to continue</p>
         <input
           type="password"
           value={key}
           onChange={(e) => setKey(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleLogin()}
           placeholder="Secret key"
-          style={{ width: "100%", padding: "10px 12px", background: "#1a1a2e", border: "1px solid #2a2a3e", borderRadius: 8, color: "#fff", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }}
+          style={{ width: "100%", padding: "12px 16px", background: "#0f1420", border: "1px solid rgba(100,160,240,0.08)", borderRadius: 12, color: "#e8ecf4", fontSize: 14, marginBottom: 14, boxSizing: "border-box", outline: "none" }}
         />
         <button
           onClick={handleLogin}
           disabled={!key || loading}
-          style={{ width: "100%", padding: "10px 0", background: "#00e5ff", color: "#000", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: key && !loading ? "pointer" : "not-allowed", opacity: key && !loading ? 1 : 0.5 }}
+          style={{
+            width: "100%",
+            padding: "12px 0",
+            background: key && !loading ? "#38bdf8" : "#161c28",
+            color: key && !loading ? "#080a0f" : "#546380",
+            border: "none",
+            borderRadius: 12,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: key && !loading ? "pointer" : "not-allowed",
+            transition: "all 180ms ease",
+            boxShadow: key && !loading ? "0 0 40px rgba(56,189,248,0.12)" : "none"
+          }}
         >
           {loading ? "Checking..." : "Unlock"}
         </button>
-        {error && <p style={{ color: "#ff4444", fontSize: 13, marginTop: 10 }}>{error}</p>}
+        {error && <p style={{ color: "#f87171", fontSize: 13, marginTop: 12 }}>{error}</p>}
       </div>
     </div>
   );
@@ -326,6 +389,12 @@ function AppInner() {
   const [showSetupAdvanced, setShowSetupAdvanced] = useState(false);
   const [showSystemDetails, setShowSystemDetails] = useState(false);
   const [showWorkspaceProfileEditor, setShowWorkspaceProfileEditor] = useState(false);
+  const [showMetaConnect, setShowMetaConnect] = useState(false);
+  const [connectStep, setConnectStep] = useState<1 | 2 | 3>(1);
+  const [connectPageUrl, setConnectPageUrl] = useState("");
+  const [connectToken, setConnectToken] = useState("");
+  const [connectResult, setConnectResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof api.getAnalytics>> | null>(null);
   const [guidedSection, setGuidedSection] = useState<GuidedSection>("PAGES");
   const [guidedWorkspace, setGuidedWorkspace] = useState<GuidedWorkspace>("PAGE");
   const [pagesView, setPagesView] = useState<PagesView>("GALLERY");
@@ -605,29 +674,16 @@ function AppInner() {
   }, []);
 
   useEffect(() => {
-    if (route.kind === "ADVANCED") {
-      setUiMode("ADVANCED");
-      if (pagesView === "EDITOR") {
-        setPagesView("GALLERY");
-      }
-      return;
-    }
-
-    setUiMode("GUIDED");
-
     if (route.kind !== "PAGES" && pagesView === "EDITOR") {
       setPagesView("GALLERY");
     }
 
     if (route.kind === "PAGES") {
-      setGuidedSection("PAGES");
-      if (!editingProfileId) {
+      if (!editingProfileId && pagesView !== "EDITOR") {
         setPagesView("GALLERY");
       }
       return;
     }
-
-    setGuidedSection("WORKSPACE");
 
     if (route.pageId) {
       const match = profiles.find((profile) => profile.pageId === route.pageId);
@@ -818,15 +874,25 @@ function AppInner() {
   async function handleSaveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const displayNamePayload = newPageName.trim() || newPageId.trim();
-    const lifestyleScenes = parseLifestyleScenes(newPersonaLifestyle);
     const referenceImagesPayload = newPersonaReferenceImages.map((dataUrl) => ({ dataUrl }));
     const anchorFromReferences = newPersonaReferenceImages[0]?.trim();
+
+    // In FROM_SCRATCH mode, AI Brain auto-fills everything the user didn't provide
+    const autoDescription = newPersonaMode === "FROM_SCRATCH"
+      ? "35-year-old American, casual confident style, natural daylight look, relatable everyday person, smartphone-native candid realism."
+      : "Page persona learned from uploaded reference photos.";
+    const autoScenes = newPersonaMode === "FROM_SCRATCH"
+      ? ["morning coffee routine", "gym cooldown", "evening neighborhood walk", "weekend market", "lunch break at a cafe", "Sunday porch planning"]
+      : ["lifestyle scene from reference photos"];
+
+    const lifestyleScenes = newPersonaLifestyle.trim()
+      ? parseLifestyleScenes(newPersonaLifestyle)
+      : autoScenes;
+
     const personaPayload = {
       mode: newPersonaMode,
       name: newPersonaName.trim() || displayNamePayload,
-      coreDescription:
-        newPersonaCoreDescription.trim() ||
-        "45+ American lifestyle creator, middle-income everyday look, natural candid expression, smartphone-native realism.",
+      coreDescription: newPersonaCoreDescription.trim() || autoDescription,
       lifestyleScenes,
       referenceImages: referenceImagesPayload,
       anchorImageUrl:
@@ -858,8 +924,9 @@ function AppInner() {
         setEditingProfileId(null);
       } else {
         const avatarPayload = newAvatarUrl.trim() ? newAvatarUrl.trim() : undefined;
+        const resolvedPageId = newPageId.trim() ? extractPageIdFromUrl(newPageId) : `page-${Date.now()}`;
         const profile = await api.createProfile({
-          pageId: newPageId.trim(),
+          pageId: resolvedPageId,
           displayName: displayNamePayload,
           avatarUrl: avatarPayload,
           persona: personaPayload,
@@ -1275,6 +1342,43 @@ function AppInner() {
     }
   }
 
+  async function handleConnectMeta() {
+    if (!selectedProfile || !connectToken.trim()) {
+      setConnectResult({ ok: false, message: "Paste your Page Access Token first." });
+      return;
+    }
+
+    setIsBusy(true);
+    setConnectResult(null);
+    try {
+      const result = await api.connectMeta(selectedProfile.pageId, connectToken.trim());
+      setConnectResult({ ok: true, message: result.pageName ? `Connected: ${result.pageName}` : "Connected successfully." });
+      setConnectToken("");
+      await refreshMetaStatus(selectedProfile.pageId);
+      setStatusText("Facebook page connected");
+    } catch (error) {
+      setConnectResult({ ok: false, message: errorMessage(error) });
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleDisconnectMeta() {
+    if (!selectedProfile) return;
+    setIsBusy(true);
+    try {
+      await api.disconnectMeta(selectedProfile.pageId);
+      setConnectResult(null);
+      setConnectToken("");
+      await refreshMetaStatus(selectedProfile.pageId);
+      setStatusText("Facebook page disconnected");
+    } catch (error) {
+      setStatusText(`Disconnect failed: ${errorMessage(error)}`);
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   function applyRecommendedDefaults() {
     setNewLevel("L1");
     setNewPolicyMode("STRICT");
@@ -1303,105 +1407,47 @@ function AppInner() {
           </div>
           <div className="brand-copy">
             <p className="brand-name">ZimFluencer</p>
-            <p className="brand-subtitle">Autonomous content studio for Facebook pages</p>
           </div>
         </div>
 
         <div className="topbar-actions">
           <div className="mode-switch">
             <button
-              className={`menu-pill ${uiMode === "GUIDED" ? "active" : ""}`}
+              className={`menu-pill ${route.kind === "PAGES" ? "active" : ""}`}
               onClick={() => navigate({ kind: "PAGES" })}
             >
-              Guided
+              Pages
             </button>
             <button
-              className={`menu-pill ${uiMode === "ADVANCED" ? "active" : ""}`}
-              onClick={() => navigate({ kind: "ADVANCED" })}
+              className={`menu-pill ${route.kind === "WORKSPACE" ? "active" : ""}`}
+              onClick={() => navigate({ kind: "WORKSPACE", pageId: selectedProfile?.pageId })}
+              disabled={!selectedProfile}
             >
-              Advanced
+              Workspace
+            </button>
+            <button
+              className={`menu-pill ${route.kind === "ANALYTICS" ? "active" : ""}`}
+              onClick={() => {
+                navigate({ kind: "ANALYTICS" });
+                if (selectedProfile) {
+                  void api.getAnalytics(selectedProfile.pageId).then(setAnalytics).catch(() => {});
+                }
+              }}
+            >
+              Analytics
             </button>
           </div>
           <span className={badgeClass(isBusy ? "RUNNING" : "COMPLETED")}>{isBusy ? "SYNCING" : "READY"}</span>
         </div>
       </header>
 
-      <section className="hero glass">
-        <div className="hero-top">
-          <div>
-            <h1>{guidedSection === "PAGES" ? "Pages Hub" : "Workspace Hub"}</h1>
-            <p className="muted">
-              {guidedSection === "PAGES"
-                ? "Create pages and keep profile setup clean. Open one page workspace when ready."
-                : selectedProfile
-                  ? `Working page: ${pageDisplayName(selectedProfile)}`
-                  : "Select or create a page to start daily workflow."}
-            </p>
-          </div>
-          <div className="hero-actions">
-            <button className="primary" type="button" onClick={goToSuggestedAction} disabled={isBusy}>
-              {selectedProfile ? `Continue: ${WORKSPACE_LABELS[suggestedWorkspace]}` : "Create First Page"}
-            </button>
-            {selectedProfile ? (
-              <span className="hero-page-chip">
-                Page: {pageDisplayName(selectedProfile)}
-                <small> · {selectedProfile.pageId}</small>
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <p className="hero-next-line">Next action: {nextActionText}</p>
-        <div className="quick-start-strip" aria-label="Quick start progress">
-          {quickStartSteps.map((step) => (
-            <span
-              key={step.key}
-              className={`quick-start-chip ${step.done ? "done" : step.active ? "active" : ""}`}
-            >
-              {step.label}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {uiMode === "GUIDED" ? (
+      {route.kind === "PAGES" || route.kind === "WORKSPACE" ? (
         <section className="panel glass focus-shell">
-          <header className="focus-header">
-            <div>
-              <h2>{guidedSection === "PAGES" ? "Pages" : "Workspace"}</h2>
-              <p className="muted">
-                {guidedSection === "PAGES"
-                  ? "Create and manage page profiles. Keep this screen focused on page setup only."
-                  : selectedProfile
-                    ? `Active page: ${pageDisplayName(selectedProfile)}. Use tabs to run content workflow with less clutter.`
-                    : "Select a page in Pages first."}
-              </p>
-            </div>
-            <div className="section-tabs">
-              <button
-                type="button"
-                className={`section-tab ${guidedSection === "PAGES" ? "active" : ""}`}
-                onClick={() => navigate({ kind: "PAGES" })}
-              >
-                Pages
-              </button>
-              <button
-                type="button"
-                className={`section-tab ${guidedSection === "WORKSPACE" ? "active" : ""}`}
-                onClick={() => navigate({ kind: "WORKSPACE", pageId: selectedProfile?.pageId })}
-                disabled={!selectedProfile}
-              >
-                Workspace
-              </button>
-            </div>
-          </header>
-
-          <p className={`smart-run-line ${smartRunStatus === "FAILED" ? "bad" : smartRunStatus === "REVIEW" ? "warn" : smartRunStatus === "DONE" ? "ok" : ""}`}>
-            {guidedSection === "WORKSPACE" && selectedProfile
-              ? `${WORKSPACE_LABELS[guidedWorkspace]} · ${statusText}`
-              : statusText}
+          <p className={`smart-run-line ${smartRunStatus === "FAILED" ? "bad" : smartRunStatus === "REVIEW" ? "warn" : smartRunStatus === "DONE" ? "ok" : ""}`} style={{ margin: "0 32px" }}>
+            {statusText}
           </p>
 
-          {guidedSection === "PAGES" ? (
+          {route.kind === "PAGES" ? (
             <div className="pages-shell">
               <section className="workspace-panel pages-toolbar-panel">
                 <div>
@@ -1517,10 +1563,17 @@ function AppInner() {
               {pagesView === "EDITOR" ? (
                 <div className="page-editor-overlay" role="dialog" aria-modal="true" aria-label="Page profile editor">
                   <section className="workspace-panel page-editor-surface page-editor-modal">
-                    <div className="row-between">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <h3>{editingProfile ? "Edit Page Profile" : "Create Page Profile"}</h3>
-                      <button className="ghost inline-small" type="button" onClick={resetProfileEditor}>
-                        Close
+                      <button
+                        type="button"
+                        onClick={resetProfileEditor}
+                        style={{ background: "transparent", border: "none", padding: 4, cursor: "pointer", display: "flex", opacity: 0.5, transition: "opacity 150ms" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.5"; }}
+                        title="Close"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round"><path d="M12 4 4 12M4 4l8 8"/></svg>
                       </button>
                     </div>
 
@@ -1530,19 +1583,24 @@ function AppInner() {
                         <input
                           value={newPageName}
                           onChange={(event) => setNewPageName(event.target.value)}
-                          placeholder="My Trading Page"
+                          placeholder="e.g. Finelo Trading, My Finance Page"
+                          required
                         />
+                        <span className="field-hint">Give your page a name — this is how you'll find it in the dashboard.</span>
                       </label>
                       <label>
-                        Facebook Page ID (required)
+                        Facebook page link or ID
                         <input
                           value={newPageId}
                           onChange={(event) => setNewPageId(event.target.value)}
-                          placeholder="1022560117608990"
-                          required
+                          placeholder="e.g. https://facebook.com/YourPage or leave empty"
                           disabled={Boolean(editingProfile)}
                         />
-                        <span className="field-hint">Use the numeric Facebook Page ID from Meta.</span>
+                        {newPageId.trim() && !/^\d+$/.test(newPageId.trim()) ? (
+                          <span className="field-hint">Detected: <strong style={{ color: "var(--accent)" }}>{extractPageIdFromUrl(newPageId)}</strong></span>
+                        ) : (
+                          <span className="field-hint">Paste a link to your Facebook page, a Page ID, or leave empty to add later.</span>
+                        )}
                       </label>
 
                       <div className="avatar-editor">
@@ -1572,88 +1630,145 @@ function AppInner() {
                       </div>
 
                       <section className="persona-editor-block">
-                        <div className="row-between">
-                          <h4>AI Persona</h4>
-                          <span className={badgeClass(newPersonaMode === "FROM_REFERENCES" ? "COMPLETED" : "WAITING_REVIEW")}>
-                            {newPersonaMode === "FROM_REFERENCES" ? "Learn from photos" : "Create from scratch"}
-                          </span>
-                        </div>
-                        <label>
-                          Persona mode
-                          <select
-                            value={newPersonaMode}
-                            onChange={(event) => setNewPersonaMode(event.target.value as PersonaSourceMode)}
-                          >
-                            {PERSONA_MODE_OPTIONS.map((mode) => (
-                              <option key={mode} value={mode}>
-                                {mode === "FROM_REFERENCES" ? "Learn from existing photos" : "Create from scratch"}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          Persona name
-                          <input
-                            value={newPersonaName}
-                            onChange={(event) => setNewPersonaName(event.target.value)}
-                            placeholder="Alex Carter"
-                          />
-                        </label>
-                        <label>
-                          Face and style description
-                          <textarea
-                            value={newPersonaCoreDescription}
-                            onChange={(event) => setNewPersonaCoreDescription(event.target.value)}
-                            placeholder="Athletic, 28 years old, confident smile, modern casual style, natural light."
-                          />
-                        </label>
-                        <label>
-                          Lifestyle scenes (comma separated)
-                          <input
-                            value={newPersonaLifestyle}
-                            onChange={(event) => setNewPersonaLifestyle(event.target.value)}
-                            placeholder="morning patio coffee, beach walk at sunset, backyard barbecue"
-                          />
-                        </label>
-                        <label className="inline-control">
-                          <input
-                            type="checkbox"
-                            checked={newPersonaAutoImages}
-                            onChange={(event) => setNewPersonaAutoImages(event.target.checked)}
-                          />
-                          Auto-generate image preview for each draft
-                        </label>
+                        <h4 style={{ marginBottom: 8 }}>AI Persona</h4>
 
-                        <div className="persona-upload-row">
-                          <label className="ghost inline-small persona-upload-trigger">
-                            Upload face references
-                            <input
-                              className="avatar-upload-input"
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={handlePersonaReferencesSelected}
-                            />
-                          </label>
-                          <span className="muted">{newPersonaReferenceImages.length}/14 image(s)</span>
+                        {/* Two path cards */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={() => setNewPersonaMode("FROM_REFERENCES")}
+                            style={{
+                              padding: "14px 12px",
+                              background: newPersonaMode === "FROM_REFERENCES" ? "var(--accent-dim)" : "var(--bg-input)",
+                              border: `1.5px solid ${newPersonaMode === "FROM_REFERENCES" ? "var(--accent)" : "var(--border)"}`,
+                              borderRadius: 12, cursor: "pointer", textAlign: "left",
+                              display: "flex", flexDirection: "column", gap: 4, transition: "all 180ms ease"
+                            }}
+                          >
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={newPersonaMode === "FROM_REFERENCES" ? "var(--accent)" : "var(--text-secondary)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                            <strong style={{ fontSize: 13, color: newPersonaMode === "FROM_REFERENCES" ? "var(--accent)" : "var(--text)" }}>I have a page</strong>
+                            <span style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4 }}>Upload photos — AI studies the face, style, and learns to create content like your page</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewPersonaMode("FROM_SCRATCH");
+                              if (!newPersonaCoreDescription.trim() || newPersonaCoreDescription === "45+ American lifestyle creator, middle-income everyday look, natural candid expression, smartphone-native realism.") {
+                                setNewPersonaCoreDescription("35-year-old American, casual confident style, natural daylight look, relatable everyday vibe.");
+                              }
+                              if (!newPersonaLifestyle.trim() || newPersonaLifestyle === "morning patio coffee, beach walk at sunset, backyard barbecue, neighborhood park stroll, weekend road trip stop") {
+                                setNewPersonaLifestyle("morning coffee routine, gym cooldown, evening walk, weekend market, lunch break");
+                              }
+                            }}
+                            style={{
+                              padding: "14px 12px",
+                              background: newPersonaMode === "FROM_SCRATCH" ? "var(--accent-dim)" : "var(--bg-input)",
+                              border: `1.5px solid ${newPersonaMode === "FROM_SCRATCH" ? "var(--accent)" : "var(--border)"}`,
+                              borderRadius: 12, cursor: "pointer", textAlign: "left",
+                              display: "flex", flexDirection: "column", gap: 4, transition: "all 180ms ease"
+                            }}
+                          >
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={newPersonaMode === "FROM_SCRATCH" ? "var(--accent)" : "var(--text-secondary)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>
+                            <strong style={{ fontSize: 13, color: newPersonaMode === "FROM_SCRATCH" ? "var(--accent)" : "var(--text)" }}>Create from scratch</strong>
+                            <span style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.4 }}>AI Brain generates everything — persona, face, content, style. Just give a name.</span>
+                          </button>
                         </div>
-                        {newPersonaReferenceImages.length > 0 ? (
-                          <div className="persona-reference-grid">
-                            {newPersonaReferenceImages.map((image, index) => (
+
+                        {/* FROM_REFERENCES: existing page */}
+                        {newPersonaMode === "FROM_REFERENCES" ? (
+                          <div className="stack-form" style={{ marginTop: 12 }}>
+                            {newPageId.trim() ? (
                               <button
-                                key={`${image.slice(0, 24)}-${index}`}
+                                className="primary"
                                 type="button"
-                                className="persona-reference-item"
-                                onClick={() => handleRemovePersonaReference(index)}
-                                title="Click to remove"
+                                disabled={isBusy}
+                                style={{ width: "100%" }}
+                                onClick={async () => {
+                                  const pageId = extractPageIdFromUrl(newPageId);
+                                  setIsBusy(true);
+                                  setStatusText("Studying your page...");
+                                  try {
+                                    const data = await api.studyPage(pageId);
+                                    if (data.pageName) {
+                                      setNewPersonaName(data.pageName);
+                                      if (!newPageName.trim()) setNewPageName(data.pageName);
+                                    }
+                                    if (data.profilePicture) setNewAvatarUrl(data.profilePicture);
+                                    const fetchedPhotos: string[] = [];
+                                    if (data.profilePicture) fetchedPhotos.push(data.profilePicture);
+                                    for (const url of data.photoUrls.slice(0, 8)) fetchedPhotos.push(url);
+                                    for (const post of data.recentPosts) {
+                                      if (post.imageUrl && fetchedPhotos.length < 12) fetchedPhotos.push(post.imageUrl);
+                                    }
+                                    if (fetchedPhotos.length > 0) {
+                                      setNewPersonaReferenceImages((current) =>
+                                        Array.from(new Set([...current, ...fetchedPhotos])).slice(0, 14)
+                                      );
+                                    }
+                                    const toneStr = data.analysis.tone.join(", ");
+                                    const topicsStr = data.analysis.topics.join(", ");
+                                    setNewPersonaCoreDescription(
+                                      `Persona from ${data.pageName}. Tone: ${toneStr}. Topics: ${topicsStr}. Engagement: ${data.analysis.avgEngagement}. Posting: ${data.analysis.postingFrequency}.`
+                                    );
+                                    setStatusText(`Studied ${data.pageName}: ${data.recentPosts.length} posts, ${fetchedPhotos.length} photos`);
+                                  } catch (error) {
+                                    setStatusText(errorMessage(error));
+                                  } finally {
+                                    setIsBusy(false);
+                                  }
+                                }}
                               >
-                                <img src={image} alt={`Persona reference ${index + 1}`} loading="lazy" decoding="async" />
+                                {isBusy ? "Studying..." : "Study my page"}
                               </button>
-                            ))}
+                            ) : (
+                              <p className="muted" style={{ fontSize: 11 }}>Paste your Facebook page link above to auto-study.</p>
+                            )}
+
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-muted)", fontSize: 11 }}>
+                              <span style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                              <span>or upload photos manually</span>
+                              <span style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                            </div>
+
+                            <div className="persona-upload-row">
+                              <label className="ghost inline-small persona-upload-trigger" style={{ cursor: "pointer" }}>
+                                Upload photos
+                                <input
+                                  className="avatar-upload-input"
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onChange={handlePersonaReferencesSelected}
+                                />
+                              </label>
+                              <span className="muted">{newPersonaReferenceImages.length}/14</span>
+                            </div>
+                            {newPersonaReferenceImages.length > 0 ? (
+                              <div className="persona-reference-grid">
+                                {newPersonaReferenceImages.map((image, index) => (
+                                  <button
+                                    key={`ref-${index}`}
+                                    type="button"
+                                    className="persona-reference-item"
+                                    onClick={() => handleRemovePersonaReference(index)}
+                                    title="Click to remove"
+                                  >
+                                    <img src={image} alt={`Reference ${index + 1}`} loading="lazy" decoding="async" />
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
-                        ) : (
-                          <p className="muted">Tip: upload 3-8 photos with one face for stronger identity consistency.</p>
-                        )}
+                        ) : null}
+
+                        {/* FROM_SCRATCH: AI Brain creates everything */}
+                        {newPersonaMode === "FROM_SCRATCH" ? (
+                          <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--bg-input)", borderRadius: 10, border: "1px solid var(--border)" }}>
+                            <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.7, margin: 0 }}>
+                              <strong style={{ color: "var(--text)" }}>AI Brain mode:</strong> System will auto-generate persona appearance, lifestyle scenes, content style, and posting strategy. You only need a name — everything else is handled autonomously.
+                            </p>
+                          </div>
+                        ) : null}
                       </section>
 
                       <button className="primary" type="submit" disabled={isBusy}>
@@ -1669,26 +1784,23 @@ function AppInner() {
                     {showSetupAdvanced ? (
                       <div className="advanced-mini">
                         <button className="ghost inline-small" type="button" onClick={applyRecommendedDefaults}>
-                          Use recommended defaults
+                          Reset to recommended
                         </button>
                         <label>
-                          Autonomy level
+                          How much freedom does AI have?
                           <select value={newLevel} onChange={(event) => setNewLevel(event.target.value as AutonomyLevel)}>
-                            {LEVEL_OPTIONS.map((level) => (
-                              <option key={level} value={level}>
-                                {level}
-                              </option>
-                            ))}
+                            <option value="L0">Full control — review everything before posting</option>
+                            <option value="L1">Mostly manual — review most content</option>
+                            <option value="L2">Semi-auto — low-risk posts go live, risky ones need review</option>
+                            <option value="L3">Fully auto — AI publishes everything that passes safety</option>
                           </select>
+                          <span className="field-hint">L0 = safest, L3 = most autonomous</span>
                         </label>
                         <label>
-                          Policy mode
+                          Content safety level
                           <select value={newPolicyMode} onChange={(event) => setNewPolicyMode(event.target.value as PolicyMode)}>
-                            {POLICY_OPTIONS.map((mode) => (
-                              <option key={mode} value={mode}>
-                                {mode}
-                              </option>
-                            ))}
+                            <option value="STRICT">Strict — extra careful with claims and language</option>
+                            <option value="STANDARD">Standard — normal safety checks</option>
                           </select>
                         </label>
                         <div className="form-3col">
@@ -1701,21 +1813,17 @@ function AppInner() {
                             <input type="number" min={0} max={20} value={newDailyReels} onChange={(event) => setNewDailyReels(Number(event.target.value))} />
                           </label>
                           <label>
-                            Hourly cap
+                            Max/hour
                             <input type="number" min={1} max={20} value={newHourlyPublishes} onChange={(event) => setNewHourlyPublishes(Number(event.target.value))} />
                           </label>
                         </div>
-                        <label>
-                          Risk threshold
-                          <input type="number" min={0} max={100} value={newRiskThreshold} onChange={(event) => setNewRiskThreshold(Number(event.target.value))} />
-                        </label>
                       </div>
                     ) : null}
                   </section>
                 </div>
               ) : null}
             </div>
-          ) : (
+          ) : route.kind === "WORKSPACE" ? (
             <div className="workspace-body">
               {!selectedProfile ? (
                 <div className="empty-state">
@@ -1796,7 +1904,12 @@ function AppInner() {
                       <button
                         key={workspace}
                         className={`workspace-tab ${guidedWorkspace === workspace ? "active" : ""}`}
-                        onClick={() => setGuidedWorkspace(workspace)}
+                        onClick={() => {
+                          setGuidedWorkspace(workspace);
+                          if (workspace === "ANALYTICS" && selectedProfile) {
+                            void api.getAnalytics(selectedProfile.pageId).then(setAnalytics).catch(() => {});
+                          }
+                        }}
                         type="button"
                       >
                         {WORKSPACE_LABELS[workspace]}
@@ -1814,21 +1927,14 @@ function AppInner() {
                     <h3>Today</h3>
                     <p className="muted">Generate fresh drafts for this page.</p>
                   </div>
-                  <div className="row-wrap">
-                    <label className="inline-control">
-                      <input type="checkbox" checked={simulate} onChange={(event) => setSimulate(event.target.checked)} />
-                      Preview mode (safe)
-                    </label>
-                    <div className="button-row inline-actions">
-                      <button className="primary" onClick={handleSmartRun} disabled={!selectedProfile || isBusy}>
-                        Run Smart Cycle
-                      </button>
-                      <button className="ghost" onClick={handleRunCycle} disabled={!selectedProfile || isBusy}>
-                        Generate Drafts Only
-                      </button>
-                    </div>
+                  <div className="button-row">
+                    <button className="primary" onClick={handleSmartRun} disabled={!selectedProfile || isBusy}>
+                      Run Smart Cycle
+                    </button>
+                    <button className="ghost" onClick={handleRunCycle} disabled={!selectedProfile || isBusy}>
+                      Generate Only
+                    </button>
                   </div>
-                  {simulate ? <p className="preview-warning">Preview mode is ON. Drafts are generated, but nothing is posted to Facebook.</p> : null}
                   <p className={`smart-run-line ${smartRunStatus === "FAILED" ? "bad" : smartRunStatus === "REVIEW" ? "warn" : smartRunStatus === "DONE" ? "ok" : ""}`}>
                     {smartRunSummary}
                   </p>
@@ -1959,8 +2065,24 @@ function AppInner() {
                               <p className="fb-preview-title">{reviewPreviewTitle || "Untitled draft"}</p>
                               <p className="fb-preview-text">{reviewPreviewBody || "Start typing to preview post text..."}</p>
                               {reviewPreviewImage ? (
-                                <div className="fb-preview-image-wrap">
-                                  <img src={reviewPreviewImage} alt="Draft generated preview" className="fb-preview-image" loading="lazy" decoding="async" />
+                                <div className="fb-preview-image-wrap" style={{ position: "relative", overflow: "hidden" }}>
+                                  <img src={reviewPreviewImage} alt="Draft generated preview" className="fb-preview-image" loading="lazy" decoding="async" style={{ opacity: isBusy ? 0.4 : 1, transition: "opacity 300ms ease" }} />
+                                  {isBusy ? (
+                                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, background: "var(--bg-surface)", overflow: "hidden" }}>
+                                      <div style={{ width: "40%", height: "100%", background: "var(--accent)", borderRadius: 2, animation: "regen-slide 1.2s ease-in-out infinite" }} />
+                                    </div>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={handleRegenerateReviewImage}
+                                    disabled={isBusy}
+                                    title="Regenerate image"
+                                    style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: 8, padding: 6, cursor: isBusy ? "wait" : "pointer", display: "flex", backdropFilter: "blur(8px)", opacity: isBusy ? 0.3 : 0.7, transition: "opacity 200ms" }}
+                                    onMouseEnter={(e) => { if (!isBusy) e.currentTarget.style.opacity = "1"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = isBusy ? "0.3" : "0.7"; }}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg>
+                                  </button>
                                 </div>
                               ) : null}
                               {reviewPreviewMediaType === "VIDEO" ? (
@@ -2047,8 +2169,24 @@ function AppInner() {
                               <p className="fb-preview-title">{reviewPreviewTitle || "Untitled draft"}</p>
                               <p className="fb-preview-text">{reviewPreviewBody || "Start typing to preview post text..."}</p>
                               {reviewPreviewImage ? (
-                                <div className="fb-preview-image-wrap">
-                                  <img src={reviewPreviewImage} alt="Draft generated preview" className="fb-preview-image" loading="lazy" decoding="async" />
+                                <div className="fb-preview-image-wrap" style={{ position: "relative", overflow: "hidden" }}>
+                                  <img src={reviewPreviewImage} alt="Draft generated preview" className="fb-preview-image" loading="lazy" decoding="async" style={{ opacity: isBusy ? 0.4 : 1, transition: "opacity 300ms ease" }} />
+                                  {isBusy ? (
+                                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 3, background: "var(--bg-surface)", overflow: "hidden" }}>
+                                      <div style={{ width: "40%", height: "100%", background: "var(--accent)", borderRadius: 2, animation: "regen-slide 1.2s ease-in-out infinite" }} />
+                                    </div>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={handleRegenerateReviewImage}
+                                    disabled={isBusy}
+                                    title="Regenerate image"
+                                    style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: 8, padding: 6, cursor: isBusy ? "wait" : "pointer", display: "flex", backdropFilter: "blur(8px)", opacity: isBusy ? 0.3 : 0.7, transition: "opacity 200ms" }}
+                                    onMouseEnter={(e) => { if (!isBusy) e.currentTarget.style.opacity = "1"; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = isBusy ? "0.3" : "0.7"; }}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></svg>
+                                  </button>
                                 </div>
                               ) : null}
                               {reviewPreviewMediaType === "VIDEO" ? (
@@ -2120,6 +2258,132 @@ function AppInner() {
                 </section>
               ) : null}
 
+              {false && guidedWorkspace === "ANALYTICS" ? (
+                <section className="workspace-panel">
+                  <div className="row-between">
+                    <h3>Analytics</h3>
+                    <button
+                      className="ghost inline-small"
+                      type="button"
+                      disabled={isBusy}
+                      onClick={async () => {
+                        if (!selectedProfile) return;
+                        setIsBusy(true);
+                        try {
+                          setAnalytics(await api.getAnalytics(selectedProfile.pageId));
+                          setStatusText("Analytics loaded");
+                        } catch (error) { setStatusText(`Analytics failed: ${errorMessage(error)}`); }
+                        finally { setIsBusy(false); }
+                      }}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {!analytics ? (
+                    <div className="empty-state">
+                      <p>Loading analytics...</p>
+                      <button className="primary inline-small" type="button" disabled={isBusy} onClick={async () => {
+                        if (!selectedProfile) return;
+                        setIsBusy(true);
+                        try { setAnalytics(await api.getAnalytics(selectedProfile.pageId)); } catch {} finally { setIsBusy(false); }
+                      }}>Load Analytics</button>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Content Overview */}
+                      <div className="metric-grid">
+                        <div className="metric-card">
+                          <span>Total content</span>
+                          <strong>{analytics.content.total}</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Published</span>
+                          <strong style={{ color: "var(--success)" }}>{analytics.content.published}</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Approval rate</span>
+                          <strong style={{ color: analytics.approvalRate >= 70 ? "var(--success)" : analytics.approvalRate >= 40 ? "var(--warning)" : "var(--danger)" }}>{analytics.approvalRate}%</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Cycles run</span>
+                          <strong>{analytics.cycles.total}</strong>
+                        </div>
+                      </div>
+
+                      {/* Content Breakdown */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div className="metric-card">
+                          <span>Posts</span>
+                          <strong>{analytics.content.posts}</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Reels</span>
+                          <strong>{analytics.content.reels}</strong>
+                        </div>
+                      </div>
+
+                      {/* Status Distribution */}
+                      <div style={{ padding: 16, background: "var(--bg-raised)", borderRadius: 12, border: "1px solid var(--border)" }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Content pipeline</p>
+                        <div style={{ display: "flex", gap: 4, height: 8, borderRadius: 4, overflow: "hidden", background: "var(--bg-surface)" }}>
+                          {analytics.content.published > 0 && <div style={{ flex: analytics.content.published, background: "var(--success)", borderRadius: 4 }} title={`Published: ${analytics.content.published}`} />}
+                          {analytics.content.approved > 0 && <div style={{ flex: analytics.content.approved - analytics.content.published, background: "var(--accent)", borderRadius: 4 }} title={`Approved: ${analytics.content.approved - analytics.content.published}`} />}
+                          {analytics.content.waiting > 0 && <div style={{ flex: analytics.content.waiting, background: "var(--warning)", borderRadius: 4 }} title={`Waiting: ${analytics.content.waiting}`} />}
+                          {analytics.content.rejected > 0 && <div style={{ flex: analytics.content.rejected, background: "var(--danger)", borderRadius: 4 }} title={`Rejected: ${analytics.content.rejected}`} />}
+                        </div>
+                        <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)" }} />Published {analytics.content.published}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--warning)" }} />Waiting {analytics.content.waiting}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--danger)" }} />Rejected {analytics.content.rejected}</span>
+                        </div>
+                      </div>
+
+                      {/* Estimated Costs */}
+                      <div style={{ padding: 16, background: "var(--bg-raised)", borderRadius: 12, border: "1px solid var(--border)" }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Estimated API costs</p>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                          <span style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--font-display)", color: "var(--text)", letterSpacing: "-0.03em" }}>${analytics.estimatedCosts.total.toFixed(2)}</span>
+                          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>total estimated</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 12, color: "var(--text-secondary)" }}>
+                          <span>Text: ${analytics.estimatedCosts.openai.toFixed(3)}</span>
+                          <span>Images: ${analytics.estimatedCosts.gemini.toFixed(3)}</span>
+                          <span>Video: ${analytics.estimatedCosts.fal.toFixed(3)}</span>
+                        </div>
+                      </div>
+
+                      {/* Recent Cycles */}
+                      {analytics.cycles.recent.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Recent cycles</p>
+                          {analytics.cycles.recent.map((c) => (
+                            <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--bg-raised)", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}>
+                              <span style={{ color: "var(--text-secondary)" }}>{formatDateCompact(c.date)}</span>
+                              <span>{c.items} items</span>
+                              <span style={{ color: "var(--success)" }}>{c.published} published</span>
+                              <span className={badgeClass(c.status)}>{c.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {/* Publishing */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div className="metric-card">
+                          <span>Publish success</span>
+                          <strong style={{ color: "var(--success)" }}>{analytics.publishing.succeeded}</strong>
+                        </div>
+                        <div className="metric-card">
+                          <span>Publish failed</span>
+                          <strong style={{ color: analytics.publishing.failed > 0 ? "var(--danger)" : "var(--text)" }}>{analytics.publishing.failed}</strong>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </section>
+              ) : null}
+
               {guidedWorkspace === "PAGE" ? (
                 <section className="workspace-panel">
                   <div className="row-between">
@@ -2180,6 +2444,152 @@ function AppInner() {
                       {metaVerify.ok ? `Connected${metaVerify.pageName ? `: ${metaVerify.pageName}` : ""}` : metaVerify.message}
                     </p>
                   ) : null}
+
+                  {/* ---- Connect Facebook Section ---- */}
+                  <div className="advanced-mini">
+                    <div className="row-between">
+                      <h4>Connect Facebook Page</h4>
+                      <button className="ghost inline-small" type="button" onClick={() => { setShowMetaConnect((s) => !s); setConnectStep(1); setConnectResult(null); }}>
+                        {showMetaConnect ? "Close" : metaStatus?.ready ? "Reconnect" : "Connect"}
+                      </button>
+                    </div>
+
+                    {!showMetaConnect && metaStatus?.ready ? (
+                      <p style={{ fontSize: 13, color: "var(--success)" }}>
+                        Page connected and ready to publish.
+                      </p>
+                    ) : !showMetaConnect ? (
+                      <p className="muted">Not connected yet. Click Connect to set up publishing to Facebook.</p>
+                    ) : null}
+
+                    {showMetaConnect ? (
+                      <div className="stack-form">
+                        {/* Step 1: Paste page link */}
+                        <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+                          {[1, 2, 3].map((s) => (
+                            <span
+                              key={s}
+                              style={{
+                                width: 28, height: 28, borderRadius: "50%",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: 12, fontWeight: 700,
+                                background: connectStep >= s ? "var(--accent)" : "var(--bg-surface)",
+                                color: connectStep >= s ? "var(--text-inverse)" : "var(--text-muted)",
+                                border: `1px solid ${connectStep >= s ? "var(--accent)" : "var(--border)"}`,
+                                transition: "all 180ms ease"
+                              }}
+                            >{s}</span>
+                          ))}
+                        </div>
+
+                        {connectStep === 1 ? (
+                          <>
+                            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                              Paste a link to your Facebook page or just the Page ID:
+                            </p>
+                            <label>
+                              Facebook Page link or ID
+                              <input
+                                value={connectPageUrl}
+                                onChange={(e) => setConnectPageUrl(e.target.value)}
+                                placeholder="e.g. https://facebook.com/YourPage or 123456789"
+                              />
+                              <span className="field-hint">
+                                Works with any format: full URL, facebook.com/pagename, or numeric ID
+                              </span>
+                            </label>
+                            {connectPageUrl.trim() ? (
+                              <p className="muted" style={{ fontSize: 12 }}>
+                                Detected Page ID: <strong style={{ color: "var(--accent)" }}>{extractPageIdFromUrl(connectPageUrl)}</strong>
+                              </p>
+                            ) : null}
+                            <button
+                              className="primary"
+                              type="button"
+                              onClick={() => {
+                                if (!connectPageUrl.trim()) return;
+                                const pageId = extractPageIdFromUrl(connectPageUrl);
+                                if (selectedProfile && pageId !== selectedProfile.pageId) {
+                                  void api.patchProfile(selectedProfile.id, { pageId } as any).catch(() => {});
+                                }
+                                setConnectStep(2);
+                              }}
+                              disabled={!connectPageUrl.trim()}
+                            >
+                              Next: Get Token
+                            </button>
+                          </>
+                        ) : null}
+
+                        {connectStep === 2 ? (
+                          <>
+                            <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7 }}>
+                              Open the link below, select your page, and click <strong style={{ color: "var(--text)" }}>"Generate Access Token"</strong>:
+                            </p>
+                            <a
+                              href="https://developers.facebook.com/tools/explorer/?permissions=pages_manage_posts,pages_read_engagement,pages_show_list"
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                                padding: "12px 20px", background: "var(--bg-surface)", border: "1px solid var(--border-accent)",
+                                borderRadius: 12, fontWeight: 600, fontSize: 13, textDecoration: "none",
+                                color: "var(--accent)", transition: "all 180ms ease"
+                              }}
+                            >
+                              Open Graph API Explorer
+                              <span style={{ fontSize: 16 }}>&#8599;</span>
+                            </a>
+                            <p className="muted" style={{ fontSize: 11, lineHeight: 1.6 }}>
+                              1. Choose your Facebook App (or create one at developers.facebook.com)<br />
+                              2. Select your page in the dropdown<br />
+                              3. Permissions are already pre-selected — just click "Generate Access Token"<br />
+                              4. Copy the token and go to the next step
+                            </p>
+                            <div className="button-row">
+                              <button className="ghost" type="button" onClick={() => setConnectStep(1)}>Back</button>
+                              <button className="primary" type="button" onClick={() => setConnectStep(3)}>
+                                I have the token
+                              </button>
+                            </div>
+                          </>
+                        ) : null}
+
+                        {connectStep === 3 ? (
+                          <>
+                            <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                              Paste the token and connect. We'll verify it immediately.
+                            </p>
+                            <label>
+                              Page Access Token
+                              <input
+                                type="password"
+                                value={connectToken}
+                                onChange={(e) => setConnectToken(e.target.value)}
+                                placeholder="Paste your token here"
+                                autoFocus
+                              />
+                            </label>
+                            <div className="button-row">
+                              <button className="ghost" type="button" onClick={() => setConnectStep(2)}>Back</button>
+                              <button className="primary" type="button" onClick={handleConnectMeta} disabled={isBusy || !connectToken.trim()}>
+                                {isBusy ? "Connecting..." : "Connect Page"}
+                              </button>
+                            </div>
+                            {connectResult ? (
+                              <p className={`smart-run-line ${connectResult.ok ? "ok" : "bad"}`}>{connectResult.message}</p>
+                            ) : null}
+                          </>
+                        ) : null}
+
+                        {metaStatus?.ready && !connectResult ? (
+                          <button className="ghost inline-small" type="button" onClick={handleDisconnectMeta} disabled={isBusy} style={{ alignSelf: "flex-start" }}>
+                            Disconnect current page
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
 
                   <div className="button-row">
                     <button
@@ -2439,6 +2849,165 @@ function AppInner() {
                 </>
               ) : null}
             </div>
+          ) : null}
+        </section>
+      ) : route.kind === "ANALYTICS" ? (
+        <section style={{ padding: "24px 32px", display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="row-between">
+            <div>
+              <h2>Analytics</h2>
+              <p className="muted">{selectedProfile ? `Page: ${pageDisplayName(selectedProfile)}` : "Select a page to view analytics"}</p>
+            </div>
+            {selectedProfile ? (
+              <div className="button-row">
+                <label className="page-picker-inline">
+                  <select value={selectedProfileId} onChange={(event) => {
+                    setSelectedProfileId(event.target.value);
+                    const p = profiles.find(pr => pr.id === event.target.value);
+                    if (p) void api.getAnalytics(p.pageId).then(setAnalytics).catch(() => {});
+                  }}>
+                    {profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>{pageDisplayName(profile)}</option>
+                    ))}
+                  </select>
+                </label>
+                <button className="ghost inline-small" type="button" disabled={isBusy} onClick={async () => {
+                  if (!selectedProfile) return;
+                  setIsBusy(true);
+                  try { setAnalytics(await api.getAnalytics(selectedProfile.pageId)); setStatusText("Analytics refreshed"); }
+                  catch (e) { setStatusText(`Failed: ${errorMessage(e)}`); }
+                  finally { setIsBusy(false); }
+                }}>Refresh</button>
+              </div>
+            ) : null}
+          </div>
+
+          {!analytics || !selectedProfile ? (
+            <div className="empty-state"><p>Select a page to view analytics.</p></div>
+          ) : (
+            <>
+              {/* Top metrics row */}
+              <div className="metric-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+                <div className="metric-card">
+                  <span>Total content</span>
+                  <strong>{analytics.content.total}</strong>
+                </div>
+                <div className="metric-card">
+                  <span>Published</span>
+                  <strong style={{ color: "var(--success)" }}>{analytics.content.published}</strong>
+                </div>
+                <div className="metric-card">
+                  <span>Approval rate</span>
+                  <strong style={{ color: analytics.approvalRate >= 70 ? "var(--success)" : analytics.approvalRate >= 40 ? "var(--warning)" : "var(--danger)" }}>{analytics.approvalRate}%</strong>
+                </div>
+                <div className="metric-card">
+                  <span>Cycles</span>
+                  <strong>{analytics.cycles.total}</strong>
+                </div>
+                <div className="metric-card">
+                  <span>API cost</span>
+                  <strong>${analytics.estimatedCosts.total.toFixed(2)}</strong>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                {/* Content Pipeline Chart */}
+                <div style={{ padding: 20, background: "var(--bg-raised)", borderRadius: 16, border: "1px solid var(--border)" }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 16 }}>Content Pipeline</p>
+                  <div style={{ display: "flex", gap: 4, height: 12, borderRadius: 6, overflow: "hidden", background: "var(--bg-surface)" }}>
+                    {analytics.content.published > 0 && <div style={{ flex: analytics.content.published, background: "var(--success)", borderRadius: 6 }} />}
+                    {(analytics.content.approved - analytics.content.published) > 0 && <div style={{ flex: analytics.content.approved - analytics.content.published, background: "var(--accent)", borderRadius: 6 }} />}
+                    {analytics.content.waiting > 0 && <div style={{ flex: analytics.content.waiting, background: "var(--warning)", borderRadius: 6 }} />}
+                    {analytics.content.rejected > 0 && <div style={{ flex: analytics.content.rejected, background: "var(--danger)", borderRadius: 6 }} />}
+                  </div>
+                  <div style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 11, color: "var(--text-muted)", flexWrap: "wrap" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)" }} />Published {analytics.content.published}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--warning)" }} />Waiting {analytics.content.waiting}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--danger)" }} />Rejected {analytics.content.rejected}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 16 }}>
+                    <div style={{ padding: "10px 12px", background: "var(--bg-surface)", borderRadius: 8 }}>
+                      <span style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>Posts</span>
+                      <p style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)" }}>{analytics.content.posts}</p>
+                    </div>
+                    <div style={{ padding: "10px 12px", background: "var(--bg-surface)", borderRadius: 8 }}>
+                      <span style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase" }}>Reels</span>
+                      <p style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)" }}>{analytics.content.reels}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cost Breakdown */}
+                <div style={{ padding: 20, background: "var(--bg-raised)", borderRadius: 16, border: "1px solid var(--border)" }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 16 }}>Cost Breakdown</p>
+                  <p style={{ fontSize: 36, fontWeight: 700, fontFamily: "var(--font-display)", letterSpacing: "-0.03em", color: "var(--text)" }}>${analytics.estimatedCosts.total.toFixed(2)}</p>
+                  <p style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 16 }}>estimated total API spend</p>
+                  {/* Mini bar chart for costs */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {[
+                      { label: "Text (OpenAI)", value: analytics.estimatedCosts.openai, color: "var(--accent)" },
+                      { label: "Images (Gemini)", value: analytics.estimatedCosts.gemini, color: "var(--success)" },
+                      { label: "Video (FAL)", value: analytics.estimatedCosts.fal, color: "var(--warning)" }
+                    ].map((row) => {
+                      const maxVal = Math.max(analytics.estimatedCosts.openai, analytics.estimatedCosts.gemini, analytics.estimatedCosts.fal, 0.001);
+                      return (
+                        <div key={row.label}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-muted)", marginBottom: 3 }}>
+                            <span>{row.label}</span>
+                            <span>${row.value.toFixed(3)}</span>
+                          </div>
+                          <div style={{ height: 6, borderRadius: 3, background: "var(--bg-surface)", overflow: "hidden" }}>
+                            <div style={{ width: `${Math.max((row.value / maxVal) * 100, 2)}%`, height: "100%", background: row.color, borderRadius: 3, transition: "width 500ms ease" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cycle History Chart */}
+              {analytics.cycles.recent.length > 0 ? (
+                <div style={{ padding: 20, background: "var(--bg-raised)", borderRadius: 16, border: "1px solid var(--border)" }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 16 }}>Recent Cycles</p>
+                  {/* SVG Bar Chart */}
+                  <div style={{ overflowX: "auto" }}>
+                    <svg width="100%" height="140" viewBox={`0 0 ${analytics.cycles.recent.length * 80} 140`} style={{ minWidth: 300 }}>
+                      {analytics.cycles.recent.slice().reverse().map((c, i) => {
+                        const maxItems = Math.max(...analytics.cycles.recent.map(r => r.items), 1);
+                        const barH = (c.items / maxItems) * 90;
+                        const pubH = (c.published / maxItems) * 90;
+                        const x = i * 80 + 10;
+                        return (
+                          <g key={c.id}>
+                            <rect x={x} y={120 - barH} width={30} height={barH} rx={4} fill="var(--bg-surface)" stroke="var(--border)" strokeWidth={1} />
+                            <rect x={x} y={120 - pubH} width={30} height={pubH} rx={4} fill="var(--accent)" opacity={0.7} />
+                            <text x={x + 15} y={135} textAnchor="middle" fill="var(--text-muted)" fontSize={9}>{formatDateCompact(c.date)}</text>
+                            <text x={x + 15} y={115 - barH} textAnchor="middle" fill="var(--text-secondary)" fontSize={10}>{c.items}</text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                  <div style={{ display: "flex", gap: 16, fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--bg-surface)", border: "1px solid var(--border)" }} />Generated</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--accent)", opacity: 0.7 }} />Published</span>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Publishing Stats */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div style={{ padding: 20, background: "var(--bg-raised)", borderRadius: 16, border: "1px solid var(--border)", textAlign: "center" }}>
+                  <p style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Publish Success</p>
+                  <p style={{ fontSize: 36, fontWeight: 700, fontFamily: "var(--font-display)", color: "var(--success)", marginTop: 4 }}>{analytics.publishing.succeeded}</p>
+                </div>
+                <div style={{ padding: 20, background: "var(--bg-raised)", borderRadius: 16, border: "1px solid var(--border)", textAlign: "center" }}>
+                  <p style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Publish Failed</p>
+                  <p style={{ fontSize: 36, fontWeight: 700, fontFamily: "var(--font-display)", color: analytics.publishing.failed > 0 ? "var(--danger)" : "var(--text-muted)", marginTop: 4 }}>{analytics.publishing.failed}</p>
+                </div>
+              </div>
+            </>
           )}
         </section>
       ) : (

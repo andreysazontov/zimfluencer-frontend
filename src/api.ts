@@ -383,5 +383,36 @@ export const api = {
     request<MetaConnectionVerification>("/integrations/meta/verify", {
       method: "POST",
       body: JSON.stringify({ pageId })
+    }),
+  connectMeta: (pageId: string, token: string) =>
+    request<{ ok: boolean; pageId: string; pageName?: string; message: string }>("/integrations/meta/connect", {
+      method: "POST",
+      body: JSON.stringify({ pageId, token })
+    }),
+  studyPage: (pageId: string) =>
+    request<{
+      pageName: string;
+      profilePicture?: string;
+      coverPhoto?: string;
+      recentPosts: Array<{ message: string; imageUrl?: string; likes: number; comments: number; createdAt: string }>;
+      photoUrls: string[];
+      analysis: { tone: string[]; topics: string[]; avgEngagement: number; postingFrequency: string };
+    }>("/integrations/meta/study", {
+      method: "POST",
+      body: JSON.stringify({ pageId })
+    }),
+  getAnalytics: (pageId: string) =>
+    request<{
+      pageId: string;
+      content: { total: number; published: number; approved: number; rejected: number; waiting: number; posts: number; reels: number };
+      cycles: { total: number; recent: Array<{ id: string; date: string; items: number; published: number; status: string }> };
+      publishing: { succeeded: number; failed: number };
+      approvalRate: number;
+      estimatedCosts: { openai: number; gemini: number; fal: number; total: number };
+    }>(`/analytics/${encodeURIComponent(pageId)}`),
+  disconnectMeta: (pageId: string) =>
+    request<{ ok: boolean; pageId: string; message: string }>("/integrations/meta/disconnect", {
+      method: "POST",
+      body: JSON.stringify({ pageId })
     })
 };

@@ -748,7 +748,7 @@ function AppInner() {
       return;
     }
 
-    if (route.pageId) {
+    if (route.kind === "WORKSPACE" && route.pageId) {
       const match = profiles.find((profile) => profile.pageId === route.pageId);
       if (match && match.id !== selectedProfileId) {
         setSelectedProfileId(match.id);
@@ -2895,7 +2895,7 @@ function AppInner() {
                 </section>
               ) : null}
 
-              {false && guidedWorkspace === "ANALYTICS" ? (
+              {false && (guidedWorkspace as string) === "ANALYTICS" ? (
                 <section className="workspace-panel">
                   <div className="row-between">
                     <h3>Analytics</h3>
@@ -2932,19 +2932,19 @@ function AppInner() {
                       <div className="metric-grid">
                         <div className="metric-card">
                           <span>Total content</span>
-                          <strong>{analytics.content.total}</strong>
+                          <strong>{analytics!.content.total}</strong>
                         </div>
                         <div className="metric-card">
                           <span>Published</span>
-                          <strong style={{ color: "var(--success)" }}>{analytics.content.published}</strong>
+                          <strong style={{ color: "var(--success)" }}>{analytics!.content.published}</strong>
                         </div>
                         <div className="metric-card">
                           <span>Approval rate</span>
-                          <strong style={{ color: analytics.approvalRate >= 70 ? "var(--success)" : analytics.approvalRate >= 40 ? "var(--warning)" : "var(--danger)" }}>{analytics.approvalRate}%</strong>
+                          <strong style={{ color: analytics!.approvalRate >= 70 ? "var(--success)" : analytics!.approvalRate >= 40 ? "var(--warning)" : "var(--danger)" }}>{analytics!.approvalRate}%</strong>
                         </div>
                         <div className="metric-card">
                           <span>Cycles run</span>
-                          <strong>{analytics.cycles.total}</strong>
+                          <strong>{analytics!.cycles.total}</strong>
                         </div>
                       </div>
 
@@ -2952,11 +2952,11 @@ function AppInner() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                         <div className="metric-card">
                           <span>Posts</span>
-                          <strong>{analytics.content.posts}</strong>
+                          <strong>{analytics!.content.posts}</strong>
                         </div>
                         <div className="metric-card">
                           <span>Reels</span>
-                          <strong>{analytics.content.reels}</strong>
+                          <strong>{analytics!.content.reels}</strong>
                         </div>
                       </div>
 
@@ -2964,15 +2964,15 @@ function AppInner() {
                       <div style={{ padding: 16, background: "var(--bg-raised)", borderRadius: 12, border: "1px solid var(--border)" }}>
                         <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Content pipeline</p>
                         <div style={{ display: "flex", gap: 4, height: 8, borderRadius: 4, overflow: "hidden", background: "var(--bg-surface)" }}>
-                          {analytics.content.published > 0 && <div style={{ flex: analytics.content.published, background: "var(--success)", borderRadius: 4 }} title={`Published: ${analytics.content.published}`} />}
-                          {analytics.content.approved > 0 && <div style={{ flex: analytics.content.approved - analytics.content.published, background: "var(--accent)", borderRadius: 4 }} title={`Approved: ${analytics.content.approved - analytics.content.published}`} />}
-                          {analytics.content.waiting > 0 && <div style={{ flex: analytics.content.waiting, background: "var(--warning)", borderRadius: 4 }} title={`Waiting: ${analytics.content.waiting}`} />}
-                          {analytics.content.rejected > 0 && <div style={{ flex: analytics.content.rejected, background: "var(--danger)", borderRadius: 4 }} title={`Rejected: ${analytics.content.rejected}`} />}
+                          {analytics!.content.published > 0 && <div style={{ flex: analytics!.content.published, background: "var(--success)", borderRadius: 4 }} title={`Published: ${analytics!.content.published}`} />}
+                          {analytics!.content.approved > 0 && <div style={{ flex: analytics!.content.approved - analytics!.content.published, background: "var(--accent)", borderRadius: 4 }} title={`Approved: ${analytics!.content.approved - analytics!.content.published}`} />}
+                          {analytics!.content.waiting > 0 && <div style={{ flex: analytics!.content.waiting, background: "var(--warning)", borderRadius: 4 }} title={`Waiting: ${analytics!.content.waiting}`} />}
+                          {analytics!.content.rejected > 0 && <div style={{ flex: analytics!.content.rejected, background: "var(--danger)", borderRadius: 4 }} title={`Rejected: ${analytics!.content.rejected}`} />}
                         </div>
                         <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11, color: "var(--text-muted)" }}>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)" }} />Published {analytics.content.published}</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--warning)" }} />Waiting {analytics.content.waiting}</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--danger)" }} />Rejected {analytics.content.rejected}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)" }} />Published {analytics!.content.published}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--warning)" }} />Waiting {analytics!.content.waiting}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--danger)" }} />Rejected {analytics!.content.rejected}</span>
                         </div>
                       </div>
 
@@ -2980,21 +2980,21 @@ function AppInner() {
                       <div style={{ padding: 16, background: "var(--bg-raised)", borderRadius: 12, border: "1px solid var(--border)" }}>
                         <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 10 }}>Estimated API costs</p>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                          <span style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--font-display)", color: "var(--text)", letterSpacing: "-0.03em" }}>${analytics.estimatedCosts.total.toFixed(2)}</span>
+                          <span style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--font-display)", color: "var(--text)", letterSpacing: "-0.03em" }}>${analytics!.estimatedCosts.total.toFixed(2)}</span>
                           <span style={{ fontSize: 11, color: "var(--text-muted)" }}>total estimated</span>
                         </div>
                         <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 12, color: "var(--text-secondary)" }}>
-                          <span>Text: ${analytics.estimatedCosts.openai.toFixed(3)}</span>
-                          <span>Images: ${analytics.estimatedCosts.gemini.toFixed(3)}</span>
-                          <span>Video: ${analytics.estimatedCosts.fal.toFixed(3)}</span>
+                          <span>Text: ${analytics!.estimatedCosts.openai.toFixed(3)}</span>
+                          <span>Images: ${analytics!.estimatedCosts.gemini.toFixed(3)}</span>
+                          <span>Video: ${analytics!.estimatedCosts.fal.toFixed(3)}</span>
                         </div>
                       </div>
 
                       {/* Recent Cycles */}
-                      {analytics.cycles.recent.length > 0 ? (
+                      {analytics!.cycles.recent.length > 0 ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           <p style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Recent cycles</p>
-                          {analytics.cycles.recent.map((c) => (
+                          {analytics!.cycles.recent.map((c) => (
                             <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--bg-raised)", borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }}>
                               <span style={{ color: "var(--text-secondary)" }}>{formatDateCompact(c.date)}</span>
                               <span>{c.items} items</span>
@@ -3009,11 +3009,11 @@ function AppInner() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                         <div className="metric-card">
                           <span>Publish success</span>
-                          <strong style={{ color: "var(--success)" }}>{analytics.publishing.succeeded}</strong>
+                          <strong style={{ color: "var(--success)" }}>{analytics!.publishing.succeeded}</strong>
                         </div>
                         <div className="metric-card">
                           <span>Publish failed</span>
-                          <strong style={{ color: analytics.publishing.failed > 0 ? "var(--danger)" : "var(--text)" }}>{analytics.publishing.failed}</strong>
+                          <strong style={{ color: analytics!.publishing.failed > 0 ? "var(--danger)" : "var(--text)" }}>{analytics!.publishing.failed}</strong>
                         </div>
                       </div>
                     </>
@@ -3060,8 +3060,7 @@ function AppInner() {
                           const cycle = await api.runCycle({
                             pageId: selectedProfile.pageId,
                             autonomyProfileId: selectedProfile.id,
-                            simulate,
-                            forceVerticalMix: [{ vertical: "FINANCE", format: "REEL", count: 1 }]
+                            simulate
                           });
                           setLatestCycle(cycle);
                           await Promise.all([
@@ -3554,7 +3553,7 @@ function AppInner() {
                   {false && (<div>{[
                         { key: "LIFESTYLE", label: "x" },
                         { key: "BEFORE_AFTER", label: "x" }
-                      ].map(({ key: preset, label, icon, desc }) => {
+                      ].map(({ key: preset, label }) => {
                         const tracks = musicTracks.filter(t => t.presets.includes(preset));
                         return (
                           <div key={preset} style={{
@@ -3565,13 +3564,11 @@ function AppInner() {
                             display: "flex", flexDirection: "column", gap: 10
                           }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.8" strokeLinecap="round"><path d={icon}/></svg>
                               <strong style={{ fontSize: 13 }}>{label}</strong>
                               <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted)", background: "var(--bg-surface)", padding: "2px 8px", borderRadius: 99 }}>
                                 {tracks.length} {tracks.length === 1 ? "track" : "tracks"}
                               </span>
                             </div>
-                            <p style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>{desc}</p>
 
                             {tracks.length > 0 && (
                               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

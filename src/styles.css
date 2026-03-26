@@ -97,7 +97,7 @@ button, input, select, textarea {
   z-index: 100;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 24px;
   padding: 0 24px;
   height: 56px;
   background: rgba(12, 12, 15, 0.85);
@@ -159,6 +159,9 @@ button, input, select, textarea {
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .menu-pill:hover { color: var(--text); }
@@ -200,6 +203,48 @@ button, input, select, textarea {
   background: rgba(248, 113, 113, 0.1);
   color: var(--danger);
   border-color: rgba(248, 113, 113, 0.2);
+}
+
+.badge-meta-connected {
+  background: rgba(52, 211, 153, 0.12);
+  color: #4ade80;
+  border-color: rgba(52, 211, 153, 0.25);
+}
+
+.badge-meta-disconnected {
+  background: rgba(248, 113, 113, 0.08);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+.danger-text {
+  color: #f87171 !important;
+}
+
+.page-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 150ms, color 150ms;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.page-card:hover .page-card-delete {
+  opacity: 0.5;
+}
+
+.page-card-delete:hover {
+  opacity: 1 !important;
+  color: #f87171;
 }
 
 /* ========== BUTTONS ========== */
@@ -470,9 +515,69 @@ select option { background: var(--bg-raised); color: var(--text); }
 
 /* ========== STATUS LINE ========== */
 
+/* Tip Cards — unified hint/info system */
+.tip-card {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.04) 0%, rgba(96, 165, 250, 0.02) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.tip-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, var(--accent), rgba(56, 189, 248, 0.2));
+  border-radius: 3px 0 0 3px;
+}
+
+.tip-card .tip-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  opacity: 0.7;
+}
+
+.tip-card strong { color: var(--text); font-weight: 600; }
+.tip-card a { color: var(--accent); text-decoration: none; }
+.tip-card a:hover { text-decoration: underline; }
+.tip-card code { color: var(--accent); font-size: 11px; background: rgba(56,189,248,0.08); padding: 1px 5px; border-radius: 4px; }
+
+.tip-card.tip-success {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.06) 0%, rgba(52, 211, 153, 0.02) 100%);
+  border-color: rgba(52, 211, 153, 0.2);
+  color: var(--success);
+}
+.tip-card.tip-success::before { background: linear-gradient(to bottom, var(--success), rgba(52,211,153,0.2)); }
+
+.tip-card.tip-warning {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.06) 0%, rgba(251, 191, 36, 0.02) 100%);
+  border-color: rgba(251, 191, 36, 0.2);
+  color: var(--warning);
+}
+.tip-card.tip-warning::before { background: linear-gradient(to bottom, var(--warning), rgba(251,191,36,0.2)); }
+
+.tip-card.tip-danger {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.06) 0%, rgba(248, 113, 113, 0.02) 100%);
+  border-color: rgba(248, 113, 113, 0.2);
+  color: var(--danger);
+}
+.tip-card.tip-danger::before { background: linear-gradient(to bottom, var(--danger), rgba(248,113,113,0.2)); }
+
 .smart-run-line {
   padding: 8px 16px;
-  margin: 0 32px;
+  margin: 0;
   border-radius: var(--radius-md);
   font-size: 12px;
   color: var(--text-secondary);
@@ -531,8 +636,10 @@ select option { background: var(--bg-raised); color: var(--text); }
 }
 
 .page-card:hover {
-  border-color: var(--border-focus);
+  border-color: var(--accent);
   background: var(--bg-surface);
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.06);
 }
 
 .page-card.selected {
@@ -651,6 +758,9 @@ select option { background: var(--bg-raised); color: var(--text); }
   border-bottom: 2px solid transparent;
   transition: all var(--transition);
   margin-bottom: -1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .workspace-tab:hover { color: var(--text-secondary); }
@@ -788,6 +898,11 @@ select option { background: var(--bg-raised); color: var(--text); }
 
 .review-inline-field {
   font-size: 12px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes regen-slide {

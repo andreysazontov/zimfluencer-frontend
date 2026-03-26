@@ -1,5 +1,35 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8787";
 
+export interface UserMusicTrack {
+  id: string;
+  name: string;
+  presets: string[];
+  category: string;
+  fileSizeBytes: number;
+  selected?: boolean;
+  createdAt: string;
+}
+
+export interface ReelDraft {
+  id: string;
+  pageId: string;
+  status: "GENERATING" | "SCRIPT_READY" | "SCENES_READY" | "VIDEO_READY" | "APPROVED" | "REJECTED" | "FAILED";
+  title: string;
+  body: string;
+  scenes: Array<{ index: number; durationSeconds: number; shotType: string; onScreenText: string; segmentLabel: string }>;
+  sceneAssets: Array<{ sceneIndex: number; imageDataUrl: string; videoUrl?: string }>;
+  videoPath?: string;
+  thumbnailDataUrl?: string;
+  durationSeconds: number;
+  voiceoverUsed: boolean;
+  assemblyLog: string[];
+  progress: string;
+  progressPercent: number;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+}
+
 export const getApiKey = (): string | null => sessionStorage.getItem("zim_api_key");
 export const setApiKey = (key: string): void => sessionStorage.setItem("zim_api_key", key);
 export const clearApiKey = (): void => sessionStorage.removeItem("zim_api_key");
@@ -197,9 +227,10 @@ export interface VideoEngineStatus {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const apiKey = getApiKey();
+  const hasBody = init?.body != null;
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
-      "Content-Type": "application/json",
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
       ...(apiKey ? { "x-api-key": apiKey } : {}),
       ...(init?.headers ?? {})
     },
@@ -384,6 +415,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ pageId })
     }),
+  deleteProfile: (id: string) =>
+    request<{ ok: boolean; id: string; pageId: string }>(`/autonomy/profiles/${encodeURIComponent(id)}`, {
+      method: "DELETE"
+    }),
+  detectPage: (token: string) =>
+    request<{ ok: boolean; pageId: string; pageName?: string; pictureUrl?: string }>("/integrations/meta/detect-page", {
+      method: "POST",
+      body: JSON.stringify({ token })
+    }),
+  saveMetaToken: (pageId: string, token: string) =>
+    request<{ ok: boolean; pageId: string; message: string }>("/integrations/meta/save-token", {
+      method: "POST",
+      body: JSON.stringify({ pageId, token })
+    }),
   connectMeta: (pageId: string, token: string) =>
     request<{ ok: boolean; pageId: string; pageName?: string; message: string }>("/integrations/meta/connect", {
       method: "POST",
@@ -401,6 +446,50 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ pageId })
     }),
+  generateReel: (pageId: string, autonomyProfileId: string, preset: string = "LIFESTYLE") =>
+    request<any>("/reels/generate", {
+      method: "POST",
+      body: JSON.stringify({ pageId, autonomyProfileId, preset })
+    }),
+  generateReelFull: (pageId: string, autonomyProfileId: string, preset: string = "LIFESTYLE") =>
+    request<{ id: string; status: string }>("/reels/generate-full", {
+      method: "POST",
+      body: JSON.stringify({ pageId, autonomyProfileId, preset })
+    }),
+  listReelDrafts: (pageId?: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (pageId) params.set("pageId", pageId);
+    if (status) params.set("status", status);
+    const qs = params.toString();
+    return request<ReelDraft[]>(qs ? `/reels/drafts?${qs}` : "/reels/drafts");
+  },
+  getReelDraft: (id: string) => request<ReelDraft>(`/reels/drafts/${encodeURIComponent(id)}`),
+  regenerateReelScene: (id: string, sceneIndex: number) =>
+    request<{ ok: boolean; sceneIndex: number; imageDataUrl: string }>(`/reels/drafts/${encodeURIComponent(id)}/regenerate-scene`, {
+      method: "POST",
+      body: JSON.stringify({ sceneIndex })
+    }),
+  advanceReelDraft: (id: string) =>
+    request<{ id: string; status: string; step?: string }>(`/reels/drafts/${encodeURIComponent(id)}/advance`, {
+      method: "POST"
+    }),
+  reviewReelDraft: (id: string, action: "APPROVE" | "REJECT", note?: string) =>
+    request<ReelDraft>(`/reels/drafts/${encodeURIComponent(id)}/review`, {
+      method: "POST",
+      body: JSON.stringify({ action, note })
+    }),
+  getReelVideoUrl: (id: string) => `${API_BASE}/reels/drafts/${encodeURIComponent(id)}/video`,
+  listMusicTracks: () => request<UserMusicTrack[]>("/music-library/tracks"),
+  uploadMusicTrack: (data: { name: string; presets: string[]; category: string; dataBase64: string }) =>
+    request<UserMusicTrack>("/music-library/tracks", { method: "POST", body: JSON.stringify(data) }),
+  selectMusicTrack: (id: string, selected: boolean, preset: string) =>
+    request<UserMusicTrack>(`/music-library/tracks/${encodeURIComponent(id)}/select`, {
+      method: "PATCH",
+      body: JSON.stringify({ selected, preset })
+    }),
+  deleteMusicTrack: (id: string) =>
+    request<{ ok: boolean }>(`/music-library/tracks/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  getMusicTrackAudioUrl: (id: string) => `${API_BASE}/music-library/tracks/${encodeURIComponent(id)}/audio`,
   getAnalytics: (pageId: string) =>
     request<{
       pageId: string;
@@ -414,5 +503,7 @@ export const api = {
     request<{ ok: boolean; pageId: string; message: string }>("/integrations/meta/disconnect", {
       method: "POST",
       body: JSON.stringify({ pageId })
-    })
+    }),
+  getConnectedPages: () =>
+    request<{ pageIds: string[] }>("/integrations/meta/connected-pages")
 };

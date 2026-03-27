@@ -748,7 +748,7 @@ function AppInner() {
       return;
     }
 
-    if (route.kind === "WORKSPACE" && route.pageId) {
+    if ("pageId" in route && route.pageId) {
       const match = profiles.find((profile) => profile.pageId === route.pageId);
       if (match && match.id !== selectedProfileId) {
         setSelectedProfileId(match.id);
@@ -3013,7 +3013,7 @@ function AppInner() {
                         </div>
                         <div className="metric-card">
                           <span>Publish failed</span>
-                          <strong style={{ color: analytics!.publishing.failed > 0 ? "var(--danger)" : "var(--text)" }}>{analytics!.publishing.failed}</strong>
+                          <strong style={{ color: analytics?.publishing?.failed && analytics!.publishing.failed > 0 ? "var(--danger)" : "var(--text)" }}>{analytics?.publishing?.failed ?? 0}</strong>
                         </div>
                       </div>
                     </>
@@ -3060,7 +3060,8 @@ function AppInner() {
                           const cycle = await api.runCycle({
                             pageId: selectedProfile.pageId,
                             autonomyProfileId: selectedProfile.id,
-                            simulate
+                            simulate,
+                            forceVerticalMix: [{ vertical: "FINANCE", format: "REEL", count: 1 }]
                           });
                           setLatestCycle(cycle);
                           await Promise.all([
@@ -3553,7 +3554,8 @@ function AppInner() {
                   {false && (<div>{[
                         { key: "LIFESTYLE", label: "x" },
                         { key: "BEFORE_AFTER", label: "x" }
-                      ].map(({ key: preset, label }) => {
+                      ].map(({ key: preset, label, ...rest }: { key: string; label: string; icon?: string; desc?: string }) => {
+                        const icon = rest.icon, desc = rest.desc;
                         const tracks = musicTracks.filter(t => t.presets.includes(preset));
                         return (
                           <div key={preset} style={{
@@ -3564,11 +3566,13 @@ function AppInner() {
                             display: "flex", flexDirection: "column", gap: 10
                           }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="1.8" strokeLinecap="round"><path d={icon}/></svg>
                               <strong style={{ fontSize: 13 }}>{label}</strong>
                               <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-muted)", background: "var(--bg-surface)", padding: "2px 8px", borderRadius: 99 }}>
                                 {tracks.length} {tracks.length === 1 ? "track" : "tracks"}
                               </span>
                             </div>
+                            <p style={{ fontSize: 11, color: "var(--text-muted)", margin: 0 }}>{desc}</p>
 
                             {tracks.length > 0 && (
                               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

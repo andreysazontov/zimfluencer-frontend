@@ -336,6 +336,7 @@ export const api = {
     pageId: string;
     autonomyProfileId: string;
     simulate: boolean;
+    forceVerticalMix?: Array<{ vertical: string; format: string; count: number }>;
   }) =>
     request<AgentCycle>("/agents/cycles/run", {
       method: "POST",
